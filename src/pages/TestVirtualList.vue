@@ -33,7 +33,7 @@ onMounted(async () => {
 <style module>
 .test-window {
     width: 500px;
-    height: 700px;
+    height: 300px;
 
     border: 1px dashed red;
 }

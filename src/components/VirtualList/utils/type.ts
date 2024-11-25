@@ -14,18 +14,16 @@ export type VirtualParent = {
     type: 'v-parent';
 
     id: string;
+    key: number;
+    childrenCount: number;
+    
     vGroup: VGroup;
-
-    nextItem?: VirtualNode;
-    prevItem?: VirtualNode;
 }
 
 export type VirtualChild = {
     type: 'v-child';
 
     id: string;
+    key: number;
     vGroupable: VGroupable;
-
-    nextItem?: VirtualNode;
-    prevItem?: VirtualNode;
 }
