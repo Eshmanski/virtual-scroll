@@ -17,16 +17,63 @@ const props = defineProps({
     }
 });
 
+const viewportEl: Ref<HTMLDivElement | null> = ref(null);
+
+const nodeHeight = ref(50);
+const viewportHeight = ref(100);
+const scrollHeight = ref(100);
+const marginTop = ref(0);
+
+const visibleList: Ref<VirtualNode[]> = ref([]);
+const flatList: Ref<VirtualNode[]> = ref([]);
 const groupMap = new Map<number, VGroup>();
 const itemMap = new Map<number, VGroupable>();
-const flatList: Ref<VirtualNode[]> = ref([]);
 
-watch(props, () => {
+const updateMaps = (groups: VGroup[], items: VGroupable[]) => {
     groupMap.clear();
     itemMap.clear();
 
-    props.groups.forEach(group => groupMap.set(group.id, group));
-    props.items.forEach(item => itemMap.set(item.id, item));
+    groups.forEach(group => groupMap.set(group.id, group));
+    items.forEach(item => itemMap.set(item.id, item));
+}
+
+const updateViewportHeight = () => {
+    if (viewportEl.value) 
+        viewportHeight.value = viewportEl.value.clientHeight;
+}
+
+const updateScrollheight = () => {
+    scrollHeight.value = flatList.value.length * nodeHeight.value;
+}
+
+const updateVisibleList = (index: number) => {
+    const count = Math.ceil(viewportHeight.value / nodeHeight.value);
+    console.log(count)
+    const startIndex = Math.max(0, index - count);
+    const endIndex = Math.min(flatList.value.length, index + count + count);
+    console.log(startIndex, endIndex)
+    visibleList.value = flatList.value.slice(startIndex, endIndex);
+    marginTop.value = startIndex * nodeHeight.value;
+
+    console.log(visibleList.value)
+}
+
+let index = 0;
+const scroll = (e: Event) => {
+    console.log('scroll')
+    const newIndex = Math.round((e.target as HTMLElement).scrollTop / nodeHeight.value);
+
+    if (newIndex !== index) {
+        updateVisibleList(newIndex);
+        index = newIndex;
+
+        console.log(visibleList.value)
+    }
+}
+
+
+watch(props, () => {
+    updateMaps(props.groups, props.items);
 
     const virtualMap: { [key: VGroup['id']]: VGroupable['id'][] } = {}
     props.items.forEach(item => {
@@ -67,21 +114,25 @@ watch(props, () => {
 
     console.log(fl);
     flatList.value = fl;
+
+    updateViewportHeight();
+    updateScrollheight();
+    updateVisibleList(0);
 });
 </script>
 
 <template>
-    <div :class="$style['virtual-list']">
-        <div>
-            <template v-for="item of flatList" :key="item.id">
-            <ParentBlock v-if="item.type === 'v-parent'" :parent="item" />
+    <div ref="viewportEl" :class="$style['virtual-list']" @scroll="scroll">
+        <div :style="{ height: scrollHeight + 'px' }">
+            <template v-for="item of visibleList" :key="item.id">
+                <ParentBlock v-if="item.type === 'v-parent'" :parent="item" />
 
-            <ChildBlock v-else="item.type === 'v-child'" :child="item">
-                <template v-slot:child="{ value }">
-                    <slot name="child" :value="value" />
-                </template>
-            </ChildBlock>
-        </template>
+                <ChildBlock v-else="item.type === 'v-child'" :child="item">
+                    <template v-slot:child="{ value }">
+                        <slot name="child" :value="value" />
+                    </template>
+                </ChildBlock>
+            </template>
         </div>
     </div>
 </template>
