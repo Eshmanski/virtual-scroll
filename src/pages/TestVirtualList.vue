@@ -23,8 +23,15 @@ onMounted(async () => {
 <template>
     <div :class="$style['test-window']">
         <VirtualLIst :items="items" :groups="groups">
+            <template v-slot:parent="{ value, count }">
+                <div :class="$style['parent-content']">
+                    <div>{{ (value as Group).name }}</div>
+                    <div>({{ count }})</div>
+                </div>
+            </template>
+
             <template v-slot:child="{ value }">
-                {{(value as Item).name}}
+                <div draggable="true">{{(value as Item).name}}</div>
             </template>
         </VirtualLIst>
     </div>
@@ -33,8 +40,18 @@ onMounted(async () => {
 <style module>
 .test-window {
     width: 500px;
-    height: 300px;
+    height: 700px;
 
     border: 1px dashed red;
+}
+
+.parent-content {
+    width: 100%;
+    height: 100%;
+
+    /* border: 1px dashed blue; */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 </style>

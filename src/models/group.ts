@@ -10,6 +10,9 @@ export default class Group implements VGroup  {
     }
 
     static getGroupList(groups: { id: number, name: string }[]) {
-        return groups.map(group => new Group(group.id, group.name));
+        const groupAll = new Group(0, 'All');
+        const groupRest = groups.map(group => new Group(group.id, group.name));
+
+        return [groupAll, ...groupRest];
     }
 }

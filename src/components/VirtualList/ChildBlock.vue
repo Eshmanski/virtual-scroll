@@ -1,10 +1,10 @@
 <template>
     <div :class="$style['child-node']">
-        <div :class="$style['text']">
-            <slot name="child" :value="child.vGroupable">
+        <slot name="child" :value="child.vGroupable">
+            <div :class="$style['text']">
                 {{ child.vGroupable }}
-            </slot>
-        </div>
+            </div>
+        </slot>
     </div>
 </template>
 

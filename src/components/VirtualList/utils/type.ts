@@ -16,7 +16,8 @@ export type VirtualParent = {
     id: string;
     key: number;
     childrenCount: number;
-    
+    isShow?: boolean;
+
     vGroup: VGroup;
 }
 
