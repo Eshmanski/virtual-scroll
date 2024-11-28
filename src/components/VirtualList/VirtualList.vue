@@ -16,6 +16,11 @@ const props = defineProps({
     items: {
         type: Array as PropType<VGroupable[]>,
         required: true
+    },
+
+    customScroll: {
+        type: Boolean,
+        default: () => false
     }
 });
 
@@ -38,7 +43,7 @@ const {
     scroll,
 } = useVirtualList(viewportEl);
 
-const { thumbHeight } = useScroll({ viewportEl, contentEl, scrollEl, thumbEl });
+const { thumbHeight } = useScroll({ disabled: !props.customScroll, viewportEl, contentEl, scrollEl, thumbEl });
 
 const expand = (id: number, flag: boolean) => {
     const parentCursorId = getParentCursor();
@@ -49,6 +54,13 @@ const expand = (id: number, flag: boolean) => {
     updateAll(props.groups, props.items);
 
     if (parentCursorId !== null) moveToGroup(parentCursorId);
+}
+
+const scrollHandler = (event: Event) => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    scroll(event)
 }
 
 watch(
@@ -72,7 +84,7 @@ onMounted(() => {
 
 <template>
     <div :class="$style['virtual-list-wrapper']" >
-        <div ref="viewportEl" :class="$style['virtual-list']" @scroll="scroll">
+        <div ref="viewportEl" :class="{[$style['virtual-list']]: true, [$style['hide-scroll']]: customScroll }" @scroll="scrollHandler">
             <div ref="contentEl" :style="{ height: scrollHeight + 'px' }">
                 <div :style="{ paddingBottom: paddingBottom + 'px', paddingTop: paddingTop + 'px' }">
                     <div v-for="item of visibleList" :key="item.key" :data-id="item.id">
@@ -106,7 +118,7 @@ onMounted(() => {
             </div>
         </div>
 
-        <div ref="scrollEl" :class="$style['scroll']">
+        <div ref="scrollEl" v-if="customScroll" :class="$style['scroll']">
             <div ref="thumbEl" :class="$style['thumb']" :style="{ height: thumbHeight + 'px' }"></div>
         </div>
     </div>
@@ -143,7 +155,7 @@ onMounted(() => {
     position: relative;
 }
 
-.virtual-list::-webkit-scrollbar {
+.hide-scroll::-webkit-scrollbar {
   display: none;
 }
 

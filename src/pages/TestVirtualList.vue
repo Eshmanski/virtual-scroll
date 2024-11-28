@@ -22,7 +22,7 @@ onMounted(async () => {
 
 <template>
     <div :class="$style['test-window']">
-        <VirtualLIst :items="items" :groups="groups">
+        <VirtualLIst :items="items" :groups="groups" :custom-scroll="true">
             <template v-slot:parent="{ value, count }">
                 <div :class="$style['parent-content']">
                     <div>{{ (value as Group).name }}</div>
