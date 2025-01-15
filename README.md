@@ -5,7 +5,7 @@
 Писал в отдельном проекте данный компонент, так как хотел изолировать его от влияния Quasar и сделать его более менее чистым, хотя дорабатывал я его уже на проекте.
 
 То как он выглядит на проекте:
-![VirtualList]()
+![VirtualList](https://github.com/Eshmanski/virtual-scroll/blob/master/public/Screenshot_5.png)
 
 # Запуск
 
