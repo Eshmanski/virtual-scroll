@@ -1,4 +1,4 @@
-import { VGroup } from "../components/VirtualList/utils/type";
+import { VGroup } from "../components/VirtualList_1/core/_type";
 
 export default class Group implements VGroup  {
     id: number;

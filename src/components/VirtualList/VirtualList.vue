@@ -1,27 +1,128 @@
+<template>
+  <div :class="$style['virtual-list-wrapper']">
+    <div
+      ref="viewportEl"
+      :class="{
+        [$style['virtual-list']]: true,
+        [$style['hide-scroll']]: customScroll,
+      }"
+      @scroll="scrollHandler"
+    >
+      <div v-if="isLoading" :class="isLoading" :style="{ height: blockHeight + 'px' }">
+        <slot name="loading">
+          Загрузка...
+        </slot>
+      </div>
+
+      <div ref="contentEl">
+        <LayerContent
+          :selected-items="selectedItems"
+          :child-class="childClass"
+          :block-height="blockHeight"
+          :state="virtualList.state"
+          @drag:start="dragStart"
+          @select:item="selectItem"
+        >
+          <template v-slot:child="data">
+            <slot name="child" v-bind="data" />
+          </template>
+
+          <template v-slot:footer>
+            <slot v-if="!isLoading && groups.length && items.length" name="footer" />
+          </template>
+        </LayerContent>
+      </div>
+
+      <LayerHeader
+        :selected-groups="selectedGroups"
+        :parent-class="parentClass"
+        :helper-class="helperClass"
+        :block-height="blockHeight"
+        :state="virtualList.state"
+        :is-helper="isHelper"
+        @expand="expand"
+        @drop:item="dropItem"
+        @select:group="selectGroup"
+      >
+        <template v-slot:parent="data">
+          <slot name="parent" v-bind="data" />
+        </template>
+
+        <template v-slot:helper="data">
+          <slot name="helper" v-bind="data" />
+        </template>
+      </LayerHeader>
+    </div>
+
+    <div ref="scrollEl" v-if="customScroll" :class="$style['scroll']">
+      <div ref="thumbEl" :class="$style['thumb']"></div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { VGroup, VGroupable } from './utils/type';
-import { onMounted, PropType, Ref, ref, watch } from 'vue';
-import EmptyBlock from './EmptyBlock.vue';
-import ParentBlock from './ParentBlock.vue';
-import ChildBlock from './ChildBlock.vue';
-import useVirtualList from './hooks/useVirtualList';
-import useScroll from './hooks/useScroll';
+import { GetFilterFn, GetSortFn, VGroup, VGroupable } from './core/_type';
+import VirtualListCore from './core/VirtualListCore';
+import { nextTick, onMounted, PropType, Ref, ref, watch } from 'vue';
+import ScrollCore from './core/ScrollCore';
+import LayerContent from './LayerContent.vue';
+import LayerHeader from './LayerHeader.vue';
+import useDragDrop from './hooks/useDragDrop';
+
+const emit = defineEmits([
+  'scrolling',
+  'expand:group',
+  'select:group',
+  'select:item',
+  'drop:item',
+]);
 
 const props = defineProps({
-    groups: {
-        type: Array as PropType<VGroup[]>,
-        required: true
-    },
+  groups: {
+    type: Array as PropType<VGroup[]>,
+    required: true,
+  },
 
-    items: {
-        type: Array as PropType<VGroupable[]>,
-        required: true
-    },
+  items: {
+    type: Array as PropType<VGroupable[]>,
+    required: true,
+  },
 
-    customScroll: {
-        type: Boolean,
-        default: () => false
-    }
+  customScroll: {
+    type: Boolean,
+    default: () => false,
+  },
+
+  parentClass: {
+    type: String,
+    default: () => '',
+  },
+
+  childClass: {
+    type: String,
+    default: () => '',
+  },
+
+  helperClass: {
+    type: String,
+    default: () => '',
+  },
+
+  blockHeight: {
+    type: Number,
+    default: () => 50,
+  },
+
+  getFilterFn: Function as PropType<GetFilterFn>,
+  getSortFn: Function as PropType<GetSortFn>,
+  isHelper: Boolean,
+
+  selectedGroups: Array as PropType<VGroup[]>,
+  selectedItems: Array as PropType<VGroupable[]>,
+  isLoading: {
+    type: Boolean,
+    default: () => false,
+  },
 });
 
 const viewportEl: Ref<HTMLDivElement | null> = ref(null);
@@ -29,143 +130,137 @@ const contentEl: Ref<HTMLDivElement | null> = ref(null);
 const scrollEl: Ref<HTMLDivElement | null> = ref(null);
 const thumbEl: Ref<HTMLDivElement | null> = ref(null);
 
-const { 
-    paddingBottom, 
-    scrollHeight,
-    visibleList,
-    nodeHeight,
-    paddingTop,
-    parentList,
-    expandId,
-    getParentCursor,
-    moveToGroup,
-    updateAll,
-    scroll,
-} = useVirtualList(viewportEl);
-
-const { thumbHeight } = useScroll({ disabled: !props.customScroll, viewportEl, contentEl, scrollEl, thumbEl });
+const virtualList = new VirtualListCore();
+const scroll = new ScrollCore();
+const { dragStart, dropItem, setOnDrop } = useDragDrop(virtualList);
 
 const expand = (id: number, flag: boolean) => {
-    const parentCursorId = getParentCursor();
+  virtualList.expandGroup(id, flag);
+  emit('expand:group', id, flag);
+};
 
-    if (flag) expandId.value = id;
-    else expandId.value = null;
+const scrollHandler = () => {
+  virtualList.scrollHandle();
+};
 
-    updateAll(props.groups, props.items);
+const selectGroup = (id: number, flag: boolean) => {
+  emit('select:group', id, flag);
+};
 
-    if (parentCursorId !== null) moveToGroup(parentCursorId);
-}
+const selectItem = (id: number, flag: boolean) => {
+  emit('select:item', id, flag);
+};
 
-const scrollHandler = (event: Event) => {
-    event.stopPropagation();
-    event.preventDefault();
+const onDrop = (item: VGroupable, gFrom: VGroup, gTo: VGroup) => {
+  emit('drop:item', item, gFrom, gTo);
+};
 
-    scroll(event)
-}
+const update = () => {
+  virtualList.computeList();
+};
+
+const focus = (itemId: number) => {
+  const result = virtualList.moveToItem(itemId);
+
+  if (!result) {
+    virtualList.expandGroup(0, true);
+
+    nextTick(() => virtualList.moveToItem(itemId));
+  }
+};
 
 watch(
-    [() => props.groups, () => props.items], 
-    ([groups, items]) => {
-        updateAll(groups, items);
-    },
-    { immediate: true }
+  [() => props.groups, () => props.items],
+  ([groups, items]) => virtualList.setData(groups, items),
+  { immediate: true },
 );
 
 onMounted(() => {
-    if (viewportEl.value) {
-        const observer = new ResizeObserver(() => {
-            updateAll(props.groups, props.items);
-        })
+  setOnDrop(onDrop);
 
-        observer.observe(viewportEl.value);
-    }
+  if (viewportEl.value && contentEl.value && scrollEl.value && thumbEl.value) {
+    virtualList.setConfig({
+      viewport_el: viewportEl.value,
+      block_height: props.blockHeight,
+      with_helpers: props.isHelper,
+      getFilterFn: props.getFilterFn,
+      getSortFn: props.getSortFn,
+    });
+
+    virtualList.setData(props.groups, props.items);
+
+    scroll.setConfig({
+      block_height: props.blockHeight,
+      disabled: false,
+      viewport_el: viewportEl.value,
+      content_el: contentEl.value,
+      scroll_el: scrollEl.value,
+      thumb_el: thumbEl.value,
+    });
+
+    scroll.setOnFastScrolling((flag: boolean) => emit('scrolling', flag));
+  }
 });
+
+defineExpose({ update, focus });
 </script>
-
-<template>
-    <div :class="$style['virtual-list-wrapper']" >
-        <div ref="viewportEl" :class="{[$style['virtual-list']]: true, [$style['hide-scroll']]: customScroll }" @scroll="scrollHandler">
-            <div ref="contentEl" :style="{ height: scrollHeight + 'px' }">
-                <div :style="{ paddingBottom: paddingBottom + 'px', paddingTop: paddingTop + 'px' }">
-                    <div v-for="item of visibleList" :key="item.key" :data-id="item.id">
-                        <EmptyBlock v-if="item.type === 'v-parent'" />
-
-                        <ChildBlock v-else="item.type === 'v-child'" :child="item" @click="() => console.log('child ', item.id)">
-                            <template v-slot:child="{ value }">
-                                <slot name="child" :value="value" />
-                            </template>
-                        </ChildBlock>
-                    </div>
-                </div>
-            </div>
-
-            <div :class="$style['parent-layer']">
-                <template v-for="parent of parentList" :key="parent.key">
-                    <div :style="{ position: 'sticky', top: 0 }">
-                        <ParentBlock 
-                            :expand="expandId === parent.vGroup.id"
-                            :parent="parent" 
-                            @expand="expand"
-                        >
-                            <template v-slot:parent="{ value, count }">
-                                <slot name="parent" :value="value" :count="count" />
-                            </template>
-                        </ParentBlock>
-                    </div>
-
-                    <div v-if="parent.isShow" :style="{ height: (nodeHeight * parent.childrenCount) + 'px'}"></div>
-                </template>
-            </div>
-        </div>
-
-        <div ref="scrollEl" v-if="customScroll" :class="$style['scroll']">
-            <div ref="thumbEl" :class="$style['thumb']" :style="{ height: thumbHeight + 'px' }"></div>
-        </div>
-    </div>
-</template>
 
 <style module>
 .virtual-list-wrapper {
-    display: flex;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .scroll {
-    width: 10px;
-    height: 100%;
+  cursor: pointer;
+  width: 6px;
+  height: calc(100% - 10px);
 
-    background-color: rgb(194, 230, 227);
-    border-radius: 2px;
-    overflow: hidden;
+  margin: 5px 2px;
+
+  background-color: #e1e1e1;
+  border-radius: 2px;
+  overflow: hidden;
 }
 
 .thumb {
-    cursor: pointer;
-    background-color: rgb(82, 151, 216);
-    border-radius: 5px;
+  cursor: pointer;
+  background-color: var(--q-primary);
+  border-radius: 5px;
 }
 
 .virtual-list {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 
-    position: relative;
+  position: relative;
 }
-
-.hide-scroll::-webkit-scrollbar {
+.virtual-list.hide-scroll {
+  overflow-y: hidden;
+}
+.virtual-list.hide-scroll::-webkit-scrollbar {
   display: none;
 }
 
 .parent-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    z-index: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
 
-    pointer-events: none;
+  pointer-events: none;
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
 }
 </style>

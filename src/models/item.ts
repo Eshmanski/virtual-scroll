@@ -1,4 +1,4 @@
-import { VGroupable } from "../components/VirtualList/utils/type";
+import { VGroupable } from "../components/VirtualList_1/core/_type";
 
 export default class Item implements VGroupable {
     id: number;
